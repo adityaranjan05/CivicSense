@@ -3,6 +3,15 @@ import { INITIAL_ISSUES, INITIAL_NOTIFICATIONS } from '../data/mockIssues';
 
 // Convert JavaScript camelCase object to Supabase snake_case schema
 export function toDbIssue(issue) {
+  // Store dispatch metadata inside triage_metadata so it is resilient against table schema differences
+  const triageMeta = {
+    ...(issue.triageMetadata || {}),
+    dispatchStatus: issue.dispatchStatus || 'Pending Verification',
+    dispatchedAt: issue.dispatchedAt || null,
+    dispatchedTo: issue.dispatchedTo || null,
+    dispatchDepartment: issue.dispatchDepartment || null
+  };
+
   return {
     id: issue.id,
     ticket_id: issue.ticketId,
@@ -22,7 +31,7 @@ export function toDbIssue(issue) {
     reporter: issue.reporter || { name: 'Citizen', isAnonymous: false },
     timeline: issue.timeline || [],
     comments: issue.comments || [],
-    triage_metadata: issue.triageMetadata || {},
+    triage_metadata: triageMeta,
     feedback: issue.feedback || null,
     reported_at: issue.reportedAt || new Date().toISOString(),
     updated_at: issue.updatedAt || new Date().toISOString()
@@ -44,6 +53,12 @@ export function fromDbIssue(row) {
     beforeUrl = 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=900&q=80';
   }
 
+  const triageMeta = row.triage_metadata || row.triageMetadata || {};
+  const dispatchStatus = row.dispatch_status || triageMeta.dispatchStatus || 'Pending Verification';
+  const dispatchedAt = row.dispatched_at || triageMeta.dispatchedAt || null;
+  const dispatchedTo = row.dispatched_to || triageMeta.dispatchedTo || null;
+  const dispatchDepartment = row.dispatch_department || triageMeta.dispatchDepartment || null;
+
   return {
     id: row.id,
     ticketId: row.ticket_id || row.ticketId,
@@ -64,7 +79,11 @@ export function fromDbIssue(row) {
     reporter: row.reporter || {},
     timeline: Array.isArray(row.timeline) ? row.timeline : [],
     comments: Array.isArray(row.comments) ? row.comments : [],
-    triageMetadata: row.triage_metadata || row.triageMetadata || {},
+    triageMetadata: triageMeta,
+    dispatchStatus,
+    dispatchedAt,
+    dispatchedTo,
+    dispatchDepartment,
     feedback: row.feedback,
     reportedAt: row.reported_at || row.reportedAt || new Date().toISOString(),
     updatedAt: row.updated_at || row.updatedAt || new Date().toISOString()

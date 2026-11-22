@@ -22,7 +22,11 @@ import {
   Flame,
   CheckSquare,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Mail,
+  MailCheck,
+  Send,
+  Loader2
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -38,8 +42,7 @@ export default function AdminDashboard() {
     statuses,
     categories,
     urgencies,
-    role,
-    setRole
+    forwardIssueEmail
   } = useCivic();
 
   const { profile, openLogin, loginAsDemo } = useAuth();
@@ -47,6 +50,14 @@ export default function AdminDashboard() {
   const [adminView, setAdminView] = useState('kanban'); // 'kanban' | 'table' | 'map'
   const [selectedDeptFilter, setSelectedDeptFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [dispatchingId, setDispatchingId] = useState(null);
+
+  const handleManualDispatch = async (e, issue) => {
+    e.stopPropagation();
+    setDispatchingId(issue.id);
+    await forwardIssueEmail(issue.id);
+    setDispatchingId(null);
+  };
 
   // Auth Guard — strictly restrict to verified municipal officials
   if (!profile || profile.role !== 'admin') {
@@ -398,7 +409,52 @@ export default function AdminDashboard() {
                           📍 {issue.location.address || issue.location.neighborhood}
                         </div>
 
-                        <div className="pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-[11px]">
+                        {/* Dispatch Status & Manual Forward Action */}
+                        <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100 dark:border-slate-700/60">
+                          <span
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${
+                              issue.dispatchStatus === 'Failed'
+                                ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                                : issue.dispatchStatus === 'Dispatched'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                            }`}
+                            title={
+                              issue.dispatchStatus === 'Dispatched'
+                                ? `Dispatched to: ${issue.dispatchedTo || 'BBMP Department Desk'}`
+                                : 'Awaiting admin verification before dispatching email'
+                            }
+                          >
+                            {issue.dispatchStatus === 'Dispatched' ? (
+                              <MailCheck className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                              <Clock className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
+                            )}
+                            <span className="truncate max-w-[125px]">
+                              {issue.dispatchStatus === 'Failed'
+                                ? 'Dispatch Failed'
+                                : issue.dispatchStatus === 'Dispatched'
+                                ? `Dispatched to ${issue.dispatchDepartment?.replace('Department of ', '') || 'Dept'}`
+                                : 'Needs Verification'}
+                            </span>
+                          </span>
+
+                          <button
+                            type="button"
+                            disabled={dispatchingId === issue.id}
+                            onClick={(e) => handleManualDispatch(e, issue)}
+                            title={issue.dispatchStatus === 'Dispatched' ? 'Re-dispatch Notice via Email' : 'Verify & Dispatch via Email'}
+                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+                          >
+                            {dispatchingId === issue.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin text-indigo-600" />
+                            ) : (
+                              <Send className="w-3 h-3" />
+                            )}
+                          </button>
+                        </div>
+
+                        <div className="pt-1.5 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-[11px]">
                           <span className="text-slate-400 dark:text-slate-500 truncate max-w-[100px]">
                             {issue.department.replace('Department of ', '')}
                           </span>
@@ -430,6 +486,7 @@ export default function AdminDashboard() {
                 <th className="p-3.5">Category</th>
                 <th className="p-3.5">Urgency</th>
                 <th className="p-3.5">Department</th>
+                <th className="p-3.5">Email Dispatch</th>
                 <th className="p-3.5">Current Status</th>
                 <th className="p-3.5 text-right">Actions</th>
               </tr>
@@ -437,7 +494,7 @@ export default function AdminDashboard() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60">
               {displayedIssues.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-slate-500 dark:text-slate-400">
+                  <td colSpan={8} className="p-8 text-center text-slate-500 dark:text-slate-400">
                     No matching complaints found.
                   </td>
                 </tr>
@@ -485,6 +542,27 @@ export default function AdminDashboard() {
                       </select>
                     </td>
                     <td className="p-3.5">
+                      <div className="flex flex-col gap-1 items-start">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                            issue.dispatchStatus === 'Failed'
+                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                              : issue.dispatchStatus === 'Pending'
+                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                              : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                          }`}
+                        >
+                          <MailCheck className="w-3 h-3" />
+                          <span>{issue.dispatchStatus === 'Failed' ? 'Failed' : issue.dispatchStatus === 'Pending' ? 'Pending' : 'Dispatched'}</span>
+                        </span>
+                        {issue.dispatchedTo && (
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 max-w-[130px] truncate" title={issue.dispatchedTo}>
+                            {issue.dispatchedTo.split(',')[0]}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3.5">
                       <select
                         value={issue.status}
                         onChange={(e) => updateIssueStatus(issue.id, e.target.value, `Status updated from table view to ${e.target.value}`)}
@@ -496,6 +574,20 @@ export default function AdminDashboard() {
                       </select>
                     </td>
                     <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
+                      <button
+                        type="button"
+                        disabled={dispatchingId === issue.id}
+                        onClick={(e) => handleManualDispatch(e, issue)}
+                        title={issue.dispatchStatus === 'Dispatched' ? 'Re-dispatch Notice via Email' : 'Verify & Dispatch via Email'}
+                        className="inline-flex items-center gap-1 text-indigo-700 dark:text-indigo-300 hover:text-indigo-900 dark:hover:text-white font-medium px-2 py-1 border border-indigo-200 dark:border-indigo-800 rounded-md bg-indigo-50/50 dark:bg-indigo-950/40 hover:bg-indigo-100 cursor-pointer disabled:opacity-50"
+                      >
+                        {dispatchingId === issue.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Send className="w-3 h-3" />
+                        )}
+                        <span className="text-[11px]">{issue.dispatchStatus === 'Dispatched' ? 'Re-dispatch' : 'Verify & Dispatch'}</span>
+                      </button>
                       <button
                         onClick={() => setSelectedIssue(issue)}
                         className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-medium px-2.5 py-1 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600"

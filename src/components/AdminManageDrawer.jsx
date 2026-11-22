@@ -10,7 +10,11 @@ import {
   Building,
   UserCheck,
   ShieldAlert,
-  Save
+  Save,
+  Mail,
+  MailCheck,
+  Send,
+  Loader2
 } from 'lucide-react';
 
 export default function AdminManageDrawer({ issue, onClose }) {
@@ -22,7 +26,8 @@ export default function AdminManageDrawer({ issue, onClose }) {
     departments,
     statuses,
     sampleImages,
-    dispatchTeams
+    dispatchTeams,
+    forwardIssueEmail
   } = useCivic();
 
   if (!issue) return null;
@@ -35,6 +40,13 @@ export default function AdminManageDrawer({ issue, onClose }) {
   const [teamName, setTeamName] = useState(issue.assignedTeam?.name || '');
   const [leadWorker, setLeadWorker] = useState(issue.assignedTeam?.leadWorker || '');
   const [contactNumber, setContactNumber] = useState(issue.assignedTeam?.contactNumber || '');
+  const [isDispatching, setIsDispatching] = useState(false);
+
+  const handleDispatchEmail = async () => {
+    setIsDispatching(true);
+    await forwardIssueEmail(issue.id);
+    setIsDispatching(false);
+  };
   const [proofPhotoUrl, setProofPhotoUrl] = useState(
     issue.afterPhotoUrl || sampleImages?.[0]?.url || 'https://images.unsplash.com/photo-1528323273322-d81458248d40?auto=format&fit=crop&w=800&q=80'
   );
@@ -119,6 +131,63 @@ export default function AdminManageDrawer({ issue, onClose }) {
               <span className="font-semibold text-slate-700 dark:text-slate-300">Reported:</span>
               <span>{new Date(issue.reportedAt).toLocaleDateString()}</span>
             </div>
+          </div>
+
+          {/* Municipal Email Auto-Dispatch Section */}
+          <div className="p-3.5 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 font-bold text-indigo-900 dark:text-indigo-200 text-xs">
+                <Mail className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <span>Municipal Email Dispatch</span>
+              </div>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  issue.dispatchStatus === 'Failed'
+                    ? 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800'
+                    : issue.dispatchStatus === 'Pending'
+                    ? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                    : 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                }`}
+              >
+                {issue.dispatchStatus || 'Dispatched'}
+              </span>
+            </div>
+
+            <div className="text-[11px] text-slate-600 dark:text-slate-300 space-y-1">
+              <div>
+                <span className="font-semibold text-slate-700 dark:text-slate-200">Department Desk:</span>{' '}
+                <span>{issue.dispatchDepartment || selectedDept}</span>
+              </div>
+              <div className="truncate">
+                <span className="font-semibold text-slate-700 dark:text-slate-200">Routed To:</span>{' '}
+                <span className="font-mono text-[10.5px]">{issue.dispatchedTo || 'comm@bbmp.gov.in, contactusbbmp@gmail.com'}</span>
+              </div>
+              {issue.dispatchedAt && (
+                <div>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">Dispatched At:</span>{' '}
+                  <span>{new Date(issue.dispatchedAt).toLocaleString()}</span>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              disabled={isDispatching}
+              onClick={handleDispatchEmail}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-indigo-600 hover:bg-indigo-500 active:scale-98 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
+            >
+              {isDispatching ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Verifying & Dispatching Email...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{issue.dispatchStatus === 'Dispatched' ? 'Re-dispatch Notice via Email' : 'Verify & Dispatch via Email'}</span>
+                </>
+              )}
+            </button>
           </div>
 
           {/* Status Selection */}

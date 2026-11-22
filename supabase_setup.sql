@@ -101,6 +101,12 @@ CREATE INDEX IF NOT EXISTS idx_issues_department ON public.issues(department);
 CREATE INDEX IF NOT EXISTS idx_issues_urgency ON public.issues(urgency);
 CREATE INDEX IF NOT EXISTS idx_issues_reported_at ON public.issues(reported_at DESC);
 
+-- Optional dispatch columns for grievance forwarding
+ALTER TABLE public.issues ADD COLUMN IF NOT EXISTS dispatch_status TEXT DEFAULT 'Pending Verification';
+ALTER TABLE public.issues ADD COLUMN IF NOT EXISTS dispatched_at TIMESTAMPTZ;
+ALTER TABLE public.issues ADD COLUMN IF NOT EXISTS dispatched_to TEXT;
+ALTER TABLE public.issues ADD COLUMN IF NOT EXISTS dispatch_department TEXT;
+
 -- ------------------------------------------------------------------------------
 -- 3. NOTIFICATIONS TABLE
 -- ------------------------------------------------------------------------------
@@ -185,3 +191,13 @@ BEGIN
     WHEN undefined_object THEN NULL;
   END;
 END $$;
+
+-- ------------------------------------------------------------------------------
+-- 6. GRANT PERMISSIONS TO SUPABASE ROLES (anon, authenticated, service_role)
+-- Crucial for enabling client-side API reads, inserts, and cross-tab realtime updates
+-- ------------------------------------------------------------------------------
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
